@@ -1,0 +1,4 @@
+*.sqlite*
+*.env
+test.mjs
+README.md
