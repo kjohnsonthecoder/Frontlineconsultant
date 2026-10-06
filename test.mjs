@@ -1,11 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createService} from './server.mjs';
-import {hostname,publicIP,redirectAllowed,redirectEvidence} from './scan.mjs';
+import {hostname,publicIP,redirectAllowed,redirectEvidence,pinnedLookup} from './scan.mjs';
+import http from 'node:http';
 import {scoreAssessment} from './model.mjs';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+test('Pinned lookup supports Node address arrays and actual HTTP connections',async()=>{
+ const lookup=pinnedLookup('127.0.0.1');
+ lookup('example.invalid',{},(error,address,family)=>{assert.equal(error,null);assert.equal(address,'127.0.0.1');assert.equal(family,4);});
+ lookup('example.invalid',{all:true},(error,addresses)=>{assert.equal(error,null);assert.deepEqual(addresses,[{address:'127.0.0.1',family:4}]);});
+ const server=http.createServer((_req,res)=>res.end('pinned'));
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ try{await new Promise((resolve,reject)=>{http.get({hostname:'example.invalid',port:server.address().port,lookup,agent:false},res=>{assert.equal(res.statusCode,200);res.resume();res.on('end',resolve);}).on('error',reject);});}
+ finally{await new Promise(resolve=>server.close(resolve));}
+});
 test('Exact scope and public-address protections',()=>{
  for(const h of ['127.0.0.1','https://frontlineconsultant.com','frontlineconsultant.com:443','Frontlineconsultant.com','a..com','localhost'])assert.equal(hostname(h),false);
  assert.equal(hostname('frontlineconsultant.com'),true);

@@ -3,7 +3,12 @@ import net from 'node:net';
 import tls from 'node:tls';
 import http from 'node:http';
 import https from 'node:https';
-export const VERSION='frontline-v1.0.1';
+export const VERSION='frontline-v1.0.2';
+export function pinnedLookup(ip){
+ return (_host,options,callback)=>options?.all
+  ?callback(null,[{address:ip,family:4}])
+  :callback(null,ip,4);
+}
 // Retain configuration evidence without storing arbitrary server-supplied URLs or secrets.
 export function redirectEvidence(location,host){
  if(!location)return 'absent';
@@ -17,7 +22,7 @@ export function publicIP(ip){
 }
 export function redirectAllowed(location,host){try{const u=new URL(location,`http://${host}/`);return u.protocol==='https:'&&u.hostname===host&&!u.username&&!u.password&&!u.port&&u.pathname==='/'&&!u.search&&!u.hash;}catch{return false;}}
 async function request(host,ip,secure,signal){return new Promise((resolve,reject)=>{
- const req=(secure?https:http).request({hostname:host,port:secure?443:80,path:'/',method:'GET',agent:false,servername:host,signal,timeout:5000,lookup:(_h,_o,cb)=>cb(null,ip,4),headers:{'User-Agent':'Frontline-V1/1.0 (authorized root-page posture check)','Accept':'text/html','Accept-Encoding':'identity'}},res=>{
+ const req=(secure?https:http).request({hostname:host,port:secure?443:80,path:'/',method:'GET',agent:false,servername:host,signal,timeout:5000,lookup:pinnedLookup(ip),headers:{'User-Agent':'Frontline-V1/1.0 (authorized root-page posture check)','Accept':'text/html','Accept-Encoding':'identity'}},res=>{
  let bytes=0;res.on('data',chunk=>{bytes+=chunk.length;if(bytes>65536)res.destroy();});
  const sock=res.socket;resolve({status:res.statusCode,headers:res.headers,tls:secure?{protocol:sock.getProtocol(),cipher:sock.getCipher(),certificate:sock.getPeerCertificate(),authorized:sock.authorized}:null});
  // No page content is retained, no links followed, no cookies replayed.
