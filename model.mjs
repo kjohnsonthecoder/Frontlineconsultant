@@ -11,6 +11,12 @@ export const MODEL = Object.freeze({
     {id:'csp', category:'Browser', label:'Content Security Policy', weight:10},
     {id:'framing', category:'Browser', label:'Framing restrictions', weight:5},
     {id:'nosniff', category:'Browser', label:'MIME sniffing protection', weight:5},
+    // V1.1 TLS detail controls are scored by FERI-0.2 in Base44. They are accepted
+    // here with zero legacy weight so the scanner's provisional FERI-0.1 remains stable.
+    {id:'tls_cert_expiry', category:'Transport', label:'Certificate expiry window', weight:0},
+    {id:'tls_hostname_match', category:'Transport', label:'Certificate hostname match', weight:0},
+    {id:'tls_chain_trust', category:'Transport', label:'Certificate chain and trust', weight:0},
+    {id:'tls_deprecated_protocols', category:'Transport', label:'Deprecated TLS protocol support', weight:0},
   ]
 });
 const VALUES = {pass:0, partial:0.5, fail:1};
