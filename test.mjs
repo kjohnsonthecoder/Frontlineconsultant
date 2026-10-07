@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createService} from './server.mjs';
-import {hostname,publicIP,redirectAllowed,redirectEvidence,pinnedLookup} from './scan.mjs';
+import {hostname,publicIP,redirectAllowed,redirectEvidence,pinnedLookup,daysUntil,certificateChainDepth,deprecatedProtocolResult} from './scan.mjs';
 import http from 'node:http';
 import {scoreAssessment} from './model.mjs';
 import {mkdtempSync,rmSync} from 'node:fs';
@@ -76,4 +76,17 @@ test('Restart preserves idempotency and failure never silently rescans',async()=
  const headers={Authorization:'Bearer '+'z'.repeat(48),'X-Frontline-Principal':'staff','X-Frontline-Role':'admin','Idempotency-Key':'durable-idempotency-123','X-Frontline-Request-ID':'6ac2e5f23f27e08217e5f34e'};
  const body=JSON.stringify({target:'frontlineconsultant.com',authorization_confirmed:true,email_domain:null});let original;
  try{for(let n=0;n<2;n++){const s=createService(config);await new Promise(r=>s.listen(0,'127.0.0.1',r));try{const base=`http://127.0.0.1:${s.address().port}`;const response=await fetch(base+'/v1/assessments',{method:'POST',headers,body});const row=await response.json();if(n===0)original=row.assessment_id;else assert.equal(row.assessment_id,original);const job=await (await fetch(base+'/v1/assessments/'+original,{headers})).json();assert.equal(job.status,'failed');assert.equal(job.code,'DNS_OR_SCOPE_BLOCKED');}finally{await new Promise(r=>s.close(r));}}assert.equal(calls,1);}finally{rmSync(dir,{recursive:true,force:true});}
+});
+
+
+test('TLS helper logic classifies expiry, chain depth, and deprecated protocol support',()=>{
+ const now=Date.parse('2026-10-07T00:00:00Z');
+ assert.equal(daysUntil('2026-11-06T00:00:00Z',now),30);
+ assert.equal(daysUntil('not-a-date',now),null);
+ const root={fingerprint256:'root',raw:Buffer.from('1')};root.issuerCertificate=root;
+ const leaf={fingerprint256:'leaf',raw:Buffer.from('2'),issuerCertificate:root};
+ assert.equal(certificateChainDepth(leaf),2);
+ assert.deepEqual(deprecatedProtocolResult([{version:'TLSv1',supported:false},{version:'TLSv1.1',supported:false}]),{status:'pass',evidence:'TLS 1.0 and TLS 1.1 were not accepted by the authorized endpoint'});
+ assert.equal(deprecatedProtocolResult([{version:'TLSv1',supported:true},{version:'TLSv1.1',supported:false}]).status,'fail');
+ assert.equal(deprecatedProtocolResult([{version:'TLSv1',supported:null},{version:'TLSv1.1',supported:false}]).status,'unknown');
 });
